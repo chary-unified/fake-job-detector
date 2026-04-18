@@ -1,6 +1,32 @@
 const DEFAULT_HF_SPACE_URL = "https://your-username-your-space.hf.space";
 const DEFAULT_HF_API_NAME = "detect_fake_job";
 const DIRECT_ENDPOINTS = ["/run/predict", "/gradio_api/run/predict", "/gradio_api/run/detect_fake_job"];
+const DESCRIPTION_SUSPICION_RULES = [
+  {
+    pattern: /\b(registration|application|joining|security|training|processing)\s+fee\b/i,
+    reason: "Mentions an upfront fee",
+  },
+  {
+    pattern: /\b(pay|send|transfer|deposit)\b.{0,40}\b(fee|money|amount|payment|charges?)\b/i,
+    reason: "Requests payment from applicant",
+  },
+  {
+    pattern: /\b(non[- ]?refundable|advance payment|refundable deposit)\b/i,
+    reason: "Uses risky payment terms",
+  },
+  {
+    pattern: /\b(no interview|without interview|guaranteed job|instant offer|100% job)\b/i,
+    reason: "Promises hiring without normal screening",
+  },
+  {
+    pattern: /\b(whatsapp|telegram)\b.{0,40}\b(only|contact|message|dm)\b/i,
+    reason: "Pushes communication to private chat apps",
+  },
+  {
+    pattern: /\b(otp|bank account|ifsc|upi id|debit card|credit card|cvv|passport)\b/i,
+    reason: "Requests sensitive data too early",
+  },
+];
 
 function parseJsonSafe(value) {
   try {
@@ -37,6 +63,74 @@ function getApiName() {
   return configuredName.startsWith("/") ? configuredName.slice(1) : configuredName;
 }
 
+function normalizeResultLabel(rawLabel) {
+  const label = String(rawLabel || "").trim();
+
+  if (/\bfake\b|fraud|scam|suspicious/i.test(label)) {
+    return "Fake Job";
+  }
+
+  if (/\breal\b|legit|legitimate|genuine|safe/i.test(label)) {
+    return "Real Job";
+  }
+
+  return label;
+}
+
+function getHeuristicSignals(description) {
+  const text = String(description || "");
+  const signals = [];
+
+  for (const rule of DESCRIPTION_SUSPICION_RULES) {
+    if (rule.pattern.test(text)) {
+      signals.push(rule.reason);
+    }
+  }
+
+  return [...new Set(signals)].slice(0, 4);
+}
+
+function getHeuristicPrediction(description) {
+  const signals = getHeuristicSignals(description);
+  if (!signals.length) {
+    return null;
+  }
+
+  return {
+    result: "Fake Job",
+    reason: `Suspicious signals detected: ${signals.join("; ")}`,
+  };
+}
+
+function applyHeuristicGuard(prediction, description) {
+  const heuristicPrediction = getHeuristicPrediction(description);
+
+  if (!heuristicPrediction) {
+    return prediction;
+  }
+
+  if (!prediction) {
+    return heuristicPrediction;
+  }
+
+  const normalizedResult = normalizeResultLabel(prediction.result);
+
+  if (normalizedResult === "Fake Job") {
+    return {
+      result: "Fake Job",
+      reason: prediction.reason
+        ? `${prediction.reason}. ${heuristicPrediction.reason}`
+        : heuristicPrediction.reason,
+    };
+  }
+
+  if (normalizedResult === "Real Job") {
+    return heuristicPrediction;
+  }
+
+  return heuristicPrediction;
+}
+
 function normalizePrediction(rawPrediction) {
   if (Array.isArray(rawPrediction)) {
     return normalizePrediction(rawPrediction[0]);
@@ -44,24 +138,26 @@ function normalizePrediction(rawPrediction) {
 
   if (rawPrediction && typeof rawPrediction === "object") {
     if (typeof rawPrediction.result === "string") {
+      const normalizedResult = normalizeResultLabel(rawPrediction.result);
       return {
-        result: rawPrediction.result,
+        result: normalizedResult || rawPrediction.result,
         reason: typeof rawPrediction.reason === "string" ? rawPrediction.reason : "",
       };
     }
 
     if (typeof rawPrediction.label === "string") {
+      const normalizedLabel = normalizeResultLabel(rawPrediction.label);
       return {
-        result: rawPrediction.label,
+        result: normalizedLabel || rawPrediction.label,
         reason: typeof rawPrediction.reason === "string" ? rawPrediction.reason : "",
       };
     }
   }
 
   if (typeof rawPrediction === "string") {
-    const looksFake = /\bfake\b|fraud|scam|fee|money|payment|warning/i.test(rawPrediction);
+    const normalizedResult = normalizeResultLabel(rawPrediction);
     return {
-      result: looksFake ? "Fake Job" : "Real Job",
+      result: normalizedResult || "Real Job",
       reason: rawPrediction,
     };
   }
@@ -218,7 +314,7 @@ export default async function handler(req, res) {
 
       const prediction = extractPredictionFromPayload(payload);
       if (response.ok && prediction) {
-        return res.status(200).json({ prediction });
+        return res.status(200).json({ prediction: applyHeuristicGuard(prediction, description) });
       }
 
       directErrors.push({
@@ -240,14 +336,24 @@ export default async function handler(req, res) {
     const queuePrediction = normalizePrediction(queueResult);
 
     if (!queuePrediction) {
+      const heuristicFallback = getHeuristicPrediction(description);
+      if (heuristicFallback) {
+        return res.status(200).json({ prediction: heuristicFallback });
+      }
+
       return res.status(502).json({
         error: "Unexpected Hugging Face response format",
         details: queueResult,
       });
     }
 
-    return res.status(200).json({ prediction: queuePrediction });
+    return res.status(200).json({ prediction: applyHeuristicGuard(queuePrediction, description) });
   } catch (error) {
+    const heuristicFallback = getHeuristicPrediction(description);
+    if (heuristicFallback) {
+      return res.status(200).json({ prediction: heuristicFallback });
+    }
+
     return res.status(502).json({
       error: "Hugging Face backend returned an error",
       details: error instanceof Error ? error.message : "Unknown error",
