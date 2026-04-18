@@ -5,15 +5,17 @@ import re
 SCAM_RULES = [
     # Strong payment indicators.
     (re.compile(r"\b(registration|application|joining|security|training|processing)\s+fee\b", re.I), 3, "Mentions an upfront fee"),
-    (re.compile(r"\b(pay|send|transfer|deposit)\b.{0,40}\b(fee|money|payment|charges?)\b", re.I), 3, "Requests payment from applicant"),
+    (re.compile(r"\b(pay|send|transfer|deposit)\b.{0,40}\b(fee|money|amount|payment|charges?)\b", re.I), 3, "Requests payment from applicant"),
     (re.compile(r"\b(non[- ]?refundable|advance payment|refundable deposit)\b", re.I), 3, "Uses risky payment terms"),
+    (re.compile(r"\b(deposit|advance)\b.{0,40}\b(onboarding|joining|laptop|training|kit|process)\b", re.I), 3, "Requests a deposit linked to onboarding"),
 
     # Unrealistic hiring promises.
     (re.compile(r"\b(no interview|without interview|instant offer|guaranteed job|100% placement)\b", re.I), 2, "Promises hiring without standard screening"),
     (re.compile(r"\b(no experience|fresher welcome|any qualification)\b", re.I), 1, "Very low hiring bar"),
 
     # Contact and identity red flags.
-    (re.compile(r"\b(whatsapp|telegram)\b", re.I), 1, "Pushes communication to private chat apps"),
+    (re.compile(r"\b(whatsapp|telegram)\b.{0,40}\b(only|contact|message|dm)\b", re.I), 1, "Pushes communication to private chat apps"),
+    (re.compile(r"\b(contact|message|dm)\b.{0,40}\b(whatsapp|telegram)\b", re.I), 1, "Pushes communication to private chat apps"),
     (re.compile(r"\b(otp|bank account|ifsc|upi|debit card|credit card|cvv|passport)\b", re.I), 2, "Requests sensitive data too early"),
 ]
 
@@ -23,6 +25,14 @@ def _salary_red_flag(text):
     return bool(re.search(r"\b(80k|100k|1\s*lakh|2\s*lakh|3\s*lakh|\d{6,})\b", text, re.I))
 
 
+def _looks_like_non_job_input(text):
+    has_url = bool(re.search(r"https?://|www\.", text, re.I))
+    word_count = len(re.findall(r"[a-z]+", text, re.I))
+
+    # URLs pasted alone (or almost alone) are not meaningful job descriptions.
+    return has_url and word_count <= 8
+
+
 def detect_fake_job(description):
     normalized_text = (description or "").strip().lower()
 
@@ -30,6 +40,12 @@ def detect_fake_job(description):
         return {
             "result": "Unknown",
             "reason": "Empty description",
+        }
+
+    if _looks_like_non_job_input(normalized_text):
+        return {
+            "result": "Unknown",
+            "reason": "Input looks like a URL or non-job text. Paste a full job description.",
         }
 
     score = 0

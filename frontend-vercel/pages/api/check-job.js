@@ -15,11 +15,19 @@ const DESCRIPTION_SUSPICION_RULES = [
     reason: "Uses risky payment terms",
   },
   {
+    pattern: /\b(deposit|advance)\b.{0,40}\b(onboarding|joining|laptop|training|kit|process)\b/i,
+    reason: "Requests a deposit linked to onboarding",
+  },
+  {
     pattern: /\b(no interview|without interview|guaranteed job|instant offer|100% job)\b/i,
     reason: "Promises hiring without normal screening",
   },
   {
     pattern: /\b(whatsapp|telegram)\b.{0,40}\b(only|contact|message|dm)\b/i,
+    reason: "Pushes communication to private chat apps",
+  },
+  {
+    pattern: /\b(contact|message|dm)\b.{0,40}\b(whatsapp|telegram)\b/i,
     reason: "Pushes communication to private chat apps",
   },
   {
@@ -77,6 +85,15 @@ function normalizeResultLabel(rawLabel) {
   return label;
 }
 
+function isLikelyNonJobInput(description) {
+  const text = String(description || "").trim();
+  const hasUrl = /https?:\/\/|www\./i.test(text);
+  const wordCount = (text.match(/[a-z]+/gi) || []).length;
+
+  // URLs pasted alone (or almost alone) are not meaningful job descriptions.
+  return hasUrl && wordCount <= 8;
+}
+
 function getHeuristicSignals(description) {
   const text = String(description || "");
   const signals = [];
@@ -91,6 +108,13 @@ function getHeuristicSignals(description) {
 }
 
 function getHeuristicPrediction(description) {
+  if (isLikelyNonJobInput(description)) {
+    return {
+      result: "Unknown",
+      reason: "Input looks like a URL or non-job text. Paste a full job description.",
+    };
+  }
+
   const signals = getHeuristicSignals(description);
   if (!signals.length) {
     return null;
@@ -302,6 +326,15 @@ export default async function handler(req, res) {
 
   if (!description) {
     return res.status(400).json({ error: "description is required" });
+  }
+
+  if (isLikelyNonJobInput(description)) {
+    return res.status(200).json({
+      prediction: {
+        result: "Unknown",
+        reason: "Input looks like a URL or non-job text. Paste a full job description.",
+      },
+    });
   }
 
   const baseUrl = getBaseUrl();
