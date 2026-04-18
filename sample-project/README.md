@@ -10,3 +10,15 @@ pinned: false
 ---
 
 Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference
+
+## API endpoint
+
+After deploy, call this endpoint:
+
+https://your-username-your-space.hf.space/run/predict
+
+Request body:
+
+{
+	"data": ["job description text"]
+}
