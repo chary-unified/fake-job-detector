@@ -1,0 +1,1 @@
+🛡️ GuardJob: AI-Driven Recruitment Fraud DetectionGuardJob is a sophisticated Full-Stack application built to combat the rising tide of online recruitment fraud. By leveraging state-of-the-art Natural Language Processing (NLP), this system helps job seekers distinguish between legitimate career opportunities and malicious scams.

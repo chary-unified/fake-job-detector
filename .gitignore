@@ -1,0 +1,11 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.bin
+*.pt
+*.pkl
+*.csv
+*.sqlite3
+.env
+.ipynb_checkpoints/

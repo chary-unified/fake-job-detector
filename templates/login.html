@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | GuardJob</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        @keyframes gradient-x {
+            0%, 100% { background-position: left center; }
+            50% { background-position: right center; }
+        }
+        .animate-gradient {
+            background-size: 200% 200%;
+            animation: gradient-x 15s ease infinite;
+        }
+        .shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 min-h-screen flex items-center justify-center p-6 animate-gradient font-sans">
+
+    <div class="glass max-w-md w-full p-8 md:p-10 rounded-3xl shadow-2xl text-center">
+        <div class="bg-indigo-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 text-white shadow-lg">
+            <i data-lucide="lock" class="w-8 h-8"></i>
+        </div>
+        
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h1>
+        <p class="text-gray-500 mb-6">Login to access the AI Detector</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="mb-6 p-4 rounded-xl flex items-center gap-3 text-sm font-semibold shake
+                {% if category == 'danger' %} bg-red-50 text-red-700 border border-red-100 
+                {% else %} bg-emerald-50 text-emerald-700 border border-emerald-100 {% endif %}">
+                <i data-lucide="alert-circle" class="w-5 h-5"></i>
+                {{ message }}
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="/login" class="space-y-5 text-left">
+            <div>
+                <label class="block text-sm font-bold text-gray-700 ml-1 mb-1.5">Username</label>
+                <div class="relative group">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400 group-focus-within:text-indigo-600 transition-colors">
+                        <i data-lucide="user" class="w-5 h-5"></i>
+                    </span>
+                    <input type="text" name="username" required 
+                        class="w-full pl-12 pr-4 py-4 rounded-xl border border-gray-200 bg-white/50 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all">
+                </div>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-bold text-gray-700 ml-1 mb-1.5">Password</label>
+                <div class="relative group">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400 group-focus-within:text-indigo-600 transition-colors">
+                        <i data-lucide="key-round" class="w-5 h-5"></i>
+                    </span>
+                    <input type="password" name="password" required 
+                        class="w-full pl-12 pr-4 py-4 rounded-xl border border-gray-200 bg-white/50 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all">
+                </div>
+            </div>
+
+            <button type="submit" class="w-full py-4 bg-indigo-600 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-700 transition-all active:scale-95 flex items-center justify-center gap-2">
+                Sign In
+                <i data-lucide="chevron-right" class="w-5 h-5"></i>
+            </button>
+        </form>
+        
+        <div class="mt-8 pt-6 border-t border-gray-100">
+            <p class="text-sm text-gray-600">
+                New user? 
+                <a href="/signup" class="text-indigo-600 font-bold hover:underline underline-offset-4">Create an account</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>
